@@ -10,11 +10,13 @@ contract Shares is Spoke, StandardToken, SharesInterface {
     string public symbol;
     string public name;
     uint8 public decimals;
+    uint public creationTime;
 
     constructor(address _hub) Spoke(_hub) {
         name = hub.name();
         symbol = "MLNF";
         decimals = 18;
+        creationTime = block.timestamp;
     }
 
     function createFor(address who, uint amount) auth {
