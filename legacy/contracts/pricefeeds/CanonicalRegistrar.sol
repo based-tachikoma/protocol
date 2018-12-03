@@ -26,7 +26,7 @@ contract CanonicalRegistrar is DSThing, DBC {
     }
 
     struct Exchange {
-        bool exists;
+        bool exists;t
         address adapter; // adapter contract for this exchange
         // One-time note: takesCustody is inverse case of isApproveOnly
         bool takesCustody; // True in case of exchange implementation which requires  are approved when an order is made instead of transfer
