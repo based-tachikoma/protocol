@@ -2,10 +2,14 @@ import * as R from 'ramda';
 import { TokenInterface } from '@melonproject/token-math/token';
 import { createQuantity } from '@melonproject/token-math/quantity';
 
-// tslint:disable:max-line-length
 import { setupInvestedTestFund } from '~/tests/utils/setupInvestedTestFund';
 import { initTestEnvironment } from '~/utils/environment/initTestEnvironment';
 import { deploySystem } from '~/utils/deploySystem';
+import { getHub } from '../../hub/calls/getHub';
+import { getSettings } from '../../hub/calls/getSettings';
+import { transfer } from '~/contracts/dependencies/token/transactions/transfer';
+import { getWrapperLock } from '~/contracts/exchanges/thirdparty/ethfinex/calls/getWrapperLock';
+import { Exchanges } from '~/Contracts';
 import {
   createOrder,
   signOrder,
@@ -13,12 +17,7 @@ import {
 } from '~/contracts/exchanges/thirdparty/0x';
 
 import { makeEthfinexOrder } from './makeEthfinexOrder';
-import { Exchanges } from '~/Contracts';
-import { getWrapperLock } from '~/contracts/exchanges/thirdparty/ethfinex/calls/getWrapperLock';
-import { getHub } from '../../hub/calls/getHub';
-import { getSettings } from '../../hub/calls/getSettings';
-import { transfer } from '~/contracts/dependencies/token/transactions/transfer';
-// tslint:enable:max-line-length
+import { cancelEthfinexOrder } from './cancelEthfinexOrder';
 
 const shared: any = {};
 
@@ -38,23 +37,15 @@ beforeAll(async () => {
   ).exchangeAddress;
 
   shared.mln = getTokenBySymbol(deployment.tokens, 'MLN');
-  shared.weth = getTokenBySymbol(deployment.tokens, 'WETH');
-  shared.zx = getTokenBySymbol(deployment.tokens, 'ZRX');
-
   shared.mlnWrapperLock = await getWrapperLock(shared.ethfinexAddress, {
     token: shared.mln,
   });
 
-  shared.wethWrapperLock = await getWrapperLock(shared.ethfinexAddress, {
-    token: shared.weth,
-  });
-
+  shared.zx = getTokenBySymbol(deployment.tokens, 'ZRX');
   shared.zxWrapperLock = await getWrapperLock(shared.ethfinexAddress, {
     token: shared.zx,
   });
-});
 
-test('Make ethfinex order from fund and take it from account in which makerToken is a non-native asset', async () => {
   const hubAddress = await getHub(
     shared.settings.tradingAddress,
     shared.environment,
@@ -78,26 +69,37 @@ test('Make ethfinex order from fund and take it from account in which makerToken
     shared.environment,
   );
 
-  const signedOrder = await signOrder(
+  shared.signedOrder = await signOrder(
     unsignedEthfinexOrder,
     shared.environment,
   );
 
   const result = await makeEthfinexOrder(
     shared.settings.tradingAddress,
-    { signedOrder },
+    { signedOrder: shared.signedOrder },
+    shared.environment,
+  );
+
+  expect(result).toBe(true);
+});
+
+// tslint:disable-next-line:max-line-length
+test('Previously made ethfinex order cancelled and not takeable anymore', async () => {
+  const result = await cancelEthfinexOrder(
+    shared.settings.tradingAddress,
+    { signedOrder: shared.signedOrder },
     shared.environment,
   );
 
   expect(result).toBe(true);
 
-  const filled = await fillOrder(
-    shared.ethfinexAddress,
-    {
-      signedOrder,
-    },
-    shared.environment,
-  );
-
-  expect(filled).toBeTruthy();
+  await expect(
+    fillOrder(
+      shared.ethfinexAddress,
+      {
+        signedOrder: shared.signedOrder,
+      },
+      shared.environment,
+    ),
+  ).rejects.toThrow('CANCELLED');
 });
